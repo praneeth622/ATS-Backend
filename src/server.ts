@@ -71,6 +71,10 @@ app.get('/api/health', (req: Request, res: Response) => {
   res.status(200).json({ status: 'ok', message: 'API is running' });
 });
 
+app.get('/', (req, res) => {
+  res.send('Backend is live');
+});
+
 // Mount API routes
 app.use('/api/auth', authRoutes);
 app.use('/api/resumes', resumeRoutes);
@@ -104,7 +108,7 @@ mongoose.connect(MONGODB_URI)
     // Start the server after DB checks are complete
     app.listen(PORT, '0.0.0.0', () => {
       console.log(`Server running at http://localhost:${PORT}`);
-      console.log(`CORS enabled for frontend access`);
+      // console.log(`CORS enabled for frontend access`);
     });
   })
   .catch((err: Error) => {
