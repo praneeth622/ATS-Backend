@@ -14,7 +14,7 @@ import { corsOptions } from '../config/cors';
 dotenv.config();
 
 // MongoDB Connection Setup
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/test';
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/test'; // Default to local MongoDB
 
 if (!MONGODB_URI) {
   console.error('No MongoDB URI provided');
@@ -23,7 +23,7 @@ if (!MONGODB_URI) {
 
 // Express app setup
 const app = express();
-const PORT = process.env.PORT || 5001;
+const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 5001;
 
 // Enable CORS - must be before other middleware
 app.use(cors(corsOptions));
@@ -102,7 +102,7 @@ mongoose.connect(MONGODB_URI)
     }
     
     // Start the server after DB checks are complete
-    app.listen(PORT, () => {
+    app.listen(PORT, '0.0.0.0', () => {
       console.log(`Server running at http://localhost:${PORT}`);
       console.log(`CORS enabled for frontend access`);
     });
