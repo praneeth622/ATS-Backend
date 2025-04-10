@@ -108,7 +108,6 @@ mongoose.connect(MONGODB_URI)
     // Start the server after DB checks are complete
     app.listen(PORT, '0.0.0.0', () => {
       console.log(`Server running at http://localhost:${PORT}`);
-      // console.log(`CORS enabled for frontend access`);
     });
   })
   .catch((err: Error) => {
