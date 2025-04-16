@@ -1,8 +1,5 @@
 import { Request, Response } from 'express';
 import Resume from '../models/Resume';
-import { PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
-import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
-import { v4 as uuidv4 } from 'uuid';
 import User from '../models/User';
 
 // Define interface for request with user
@@ -108,23 +105,17 @@ export const saveResume = async (req: AuthRequest, res: Response) => {
 export const getUserResumes = async (req: AuthRequest, res: Response) => {
   try {
     // Debug logs to help troubleshoot
-    console.log('Request query:', req.query);
-    console.log('Request body:', req.body);
     console.log('Request user:', req.user);
     
-    // Try to get userId from multiple places
-    const queryUserId = req.query.userId as string;
-    const bodyUserId = req.body?.userId;
-    const userIdentifier = req.user?.uid || queryUserId || bodyUserId;
-    
-    console.log('Using User ID:', userIdentifier);
-    
-    if (!userIdentifier) {
-      console.log('No user identifier found in request');
+    if (!req.user || !req.user.uid) {
+      console.log('No user found in request');
       return res.status(401).json({ error: 'User not authenticated' });
     }
     
-    const resumes = await Resume.find({ user_id: userIdentifier }).sort({ uploaded_at: -1 });
+    const resumes = await Resume.find({ user_id: req.user.uid })
+      .sort({ uploaded_at: -1 })
+      .select('-__v'); // Exclude version field
+    
     console.log('Resumes found:', resumes.length);
     return res.status(200).json(resumes);
   } catch (error) {
@@ -141,6 +132,12 @@ export const getResumeById = async (req: AuthRequest, res: Response) => {
     
     if (!userId) {
       return res.status(401).json({ error: 'User not authenticated' });
+    }
+    
+    // Check if the ID is valid before querying MongoDB
+    if (id === 'user' || !id.match(/^[0-9a-fA-F]{24}$/)) {
+      console.log(`Invalid resume ID format: "${id}"`);
+      return res.status(400).json({ error: 'Invalid resume ID format' });
     }
     
     const resume = await Resume.findOne({ _id: id, user_id: userId });
@@ -164,6 +161,12 @@ export const deleteResume = async (req: AuthRequest, res: Response) => {
     
     if (!userId) {
       return res.status(401).json({ error: 'User not authenticated' });
+    }
+    
+    // Check if the ID is valid before querying MongoDB
+    if (id === 'user' || !id.match(/^[0-9a-fA-F]{24}$/)) {
+      console.log(`Invalid resume ID format: "${id}"`);
+      return res.status(400).json({ error: 'Invalid resume ID format' });
     }
     
     const deletedResume = await Resume.findOneAndDelete({ _id: id, user_id: userId });

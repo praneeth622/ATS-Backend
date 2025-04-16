@@ -9,6 +9,8 @@ import resumeRoutes from '../routes/resume';
 import jobRoutes from '../routes/job';
 import vendorRoutes from '../routes/vendor';
 import { corsOptions } from '../config/cors';
+import { createServer } from 'http';
+import * as net from 'net';
 
 // Load environment variables
 dotenv.config();
@@ -23,7 +25,41 @@ if (!MONGODB_URI) {
 
 // Express app setup
 const app = express();
-const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 5001;
+let PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 5001;
+
+// Function to check if a port is in use
+const isPortInUse = (port: number): Promise<boolean> => {
+  return new Promise((resolve) => {
+    const server = net.createServer()
+      .once('error', () => {
+        // Port is in use
+        resolve(true);
+      })
+      .once('listening', () => {
+        // Port is free
+        server.close();
+        resolve(false);
+      })
+      .listen(port, '0.0.0.0');
+  });
+};
+
+// Function to find an available port
+const findAvailablePort = async (startPort: number, maxAttempts: number = 10): Promise<number> => {
+  let port = startPort;
+  let attempts = 0;
+  
+  while (attempts < maxAttempts) {
+    const inUse = await isPortInUse(port);
+    if (!inUse) {
+      return port;
+    }
+    port++;
+    attempts++;
+  }
+  
+  throw new Error(`Could not find an available port after ${maxAttempts} attempts`);
+};
 
 // Enable CORS - must be before other middleware
 app.use(cors(corsOptions));
@@ -92,7 +128,7 @@ app.use((req: Request, res: Response) => {
   res.status(404).json({ error: 'Route not found' });
 });
 
-// Initialize MongoDB connection
+// Initialize MongoDB connection and start server
 mongoose.connect(MONGODB_URI)
   .then(async () => {
     console.log('Connected to MongoDB');
@@ -101,17 +137,59 @@ mongoose.connect(MONGODB_URI)
     try {
       const { initializeDatabase } = await import('../utils/db-init');
       await initializeDatabase();
+      
+      // Check if the configured port is available, if not find an available one
+      try {
+        const inUse = await isPortInUse(PORT);
+        if (inUse) {
+          console.warn(`Port ${PORT} is already in use.`);
+          PORT = await findAvailablePort(PORT + 1);
+          console.log(`Using alternative port: ${PORT}`);
+        }
+        
+        // Create HTTP server
+        const server = createServer(app);
+        
+        // Start the server with the available port
+        server.listen(PORT, '0.0.0.0', () => {
+          console.log(`Server running at http://localhost:${PORT}`);
+        });
+        
+        // Handle graceful shutdown
+        const shutdown = () => {
+          console.log('Shutting down server...');
+          server.close(() => {
+            console.log('Server closed');
+            // Close mongoose connection without callback (updated for newer Mongoose versions)
+            mongoose.connection.close()
+              .then(() => {
+                console.log('MongoDB connection closed');
+                process.exit(0);
+              })
+              .catch(err => {
+                console.error('Error closing MongoDB connection:', err);
+                process.exit(1);
+              });
+          });
+        };
+        
+        process.on('SIGTERM', shutdown);
+        process.on('SIGINT', shutdown);
+        
+      } catch (portError) {
+        console.error('Failed to start server:', portError);
+        mongoose.connection.close();
+        process.exit(1);
+      }
+      
     } catch (initError) {
       console.error('Error during database initialization:', initError);
+      process.exit(1);
     }
-    
-    // Start the server after DB checks are complete
-    app.listen(PORT, '0.0.0.0', () => {
-      console.log(`Server running at http://localhost:${PORT}`);
-    });
   })
   .catch((err: Error) => {
     console.error('MongoDB connection error:', err);
+    process.exit(1);
   });
 
 export default app;

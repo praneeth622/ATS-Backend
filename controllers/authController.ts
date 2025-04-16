@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import User from '../models/User';
+import { supabaseAdmin } from '../utils/supabase';
 
 // Define interface for authenticated request
 interface AuthRequest extends Request {
@@ -163,7 +164,7 @@ export const updateUserRole = async (req: AuthRequest, res: Response) => {
   }
 };
 
-// Create user from Firebase auth data (no authentication required)
+// Create user from Supabase auth data (no authentication required)
 export const createUserFromAuth = async (req: Request, res: Response) => {
   // Handle preflight OPTIONS request
   if (req.method === 'OPTIONS') {

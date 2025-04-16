@@ -22,12 +22,16 @@ router.options('*', cors(corsOptions));
 // Add explicit preflight handling for high-traffic routes
 router.options('/admin/all', cors(corsOptions));
 router.options('/check-duplicate', cors(corsOptions));
+router.options('/user', cors(corsOptions));
 
 // Apply authentication middleware to all routes
 router.use(authenticate);
 
 // Admin routes (must come before routes with params)
 router.get('/admin/all', isAdmin, getAllResumes);
+
+// Special route for user resumes - must come before routes with :id
+router.get('/user', getUserResumes);
 
 // Resume routes with query parameters (must come before routes with :id)
 router.get('/', getUserResumes);
